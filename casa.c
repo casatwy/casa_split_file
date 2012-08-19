@@ -255,7 +255,7 @@ PHP_FUNCTION(casa_split_file)
 
     total_count = ceil(file_info.st_size / file_piece_size);
     total_count = 3;
-    for(current_count = 0; current_count <= total_count; current_count++){
+    for(current_count = 0; current_count < total_count; current_count++){
         sprintf(count_string, "%d", current_count);
         strcpy(new_file_path, filepath);
         strcat(new_file_path, count_string);
@@ -270,7 +270,7 @@ PHP_FUNCTION(casa_split_file)
 
 
         //printf("%c\n", flag);
-        printf("here is %s\n", new_file_path);
+        printf("casa is %s\n", new_file_path);
 
         ////writed_length = write(file_piece_descriptor, file_map_addr + page_offset, file_piece_size);
 
