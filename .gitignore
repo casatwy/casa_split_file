@@ -26,3 +26,4 @@ config.status
 libtool
 .libs/
 modules/
+tags

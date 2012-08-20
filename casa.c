@@ -33,6 +33,7 @@ ZEND_DECLARE_MODULE_GLOBALS(casa)
 
 /* True global resources - no need for thread safety here */
 static int le_casa;
+static off64_t _get_end_offset(char*, off64_t, long long, int);
 
 /* {{{ casa_functions[]
  *
@@ -192,21 +193,26 @@ PHP_FUNCTION(casa_split_file)
     int sys_page_size;
     int file_piece_size;
     /*variable for mmap*/
-    long long *file_map_addr;
+    char *file_map_addr;
     int file_descriptor, file_piece_descriptor;
     struct stat file_info;
     off64_t page_offset = 0;
     off64_t seek_offset = 0;
+    off64_t start_offset = 0;
+    off64_t end_offset = 0;
 
     ssize_t writed_length;
     char new_file_path[256];
-    char flag;
-    ssize_t flag_length;
     char count_string[10];
 
-	if (zend_parse_parameters(argc TSRMLS_CC, "ss", &dir, &dir_len, &filename, &filename_len) == FAILURE) 
-		return;
 
+	if (zend_parse_parameters(argc TSRMLS_CC, "ss", &dir, &dir_len, &filename, &filename_len) == FAILURE){
+		return;
+    } 
+
+    if(*(dir+dir_len-1) != 47){
+        strcat(dir, "/\0");
+    }
 
     sys_page_size = sysconf(_SC_PAGE_SIZE);
     file_piece_size = sys_page_size*2*1024;
@@ -234,13 +240,13 @@ PHP_FUNCTION(casa_split_file)
 
 
     /*if file size is less than a piece of file, we won't split it. */
-    //if(file_info.st_size <= file_piece_size){
-    //    add_assoc_bool(return_value, "state", 1);
+    if(file_info.st_size <= file_piece_size){
+        add_assoc_bool(return_value, "state", 1);
 
-    //    add_next_index_string(result_files, filepath, 1);
-    //    add_assoc_zval(return_value, "files", result_files);
-    //    return;
-    //}
+        add_next_index_string(result_files, filepath, 1);
+        add_assoc_zval(return_value, "files", result_files);
+        return;
+    }
 
     file_map_addr = mmap(NULL, file_info.st_size, PROT_READ, MAP_PRIVATE, file_descriptor, 0);
     if(file_map_addr == MAP_FAILED){
@@ -254,26 +260,22 @@ PHP_FUNCTION(casa_split_file)
 
 
     total_count = ceil(file_info.st_size / file_piece_size);
-    total_count = 3;
+
     for(current_count = 0; current_count < total_count; current_count++){
         sprintf(count_string, "%d", current_count);
         strcpy(new_file_path, filepath);
         strcat(new_file_path, count_string);
 
-        file_piece_descriptor = open(new_file_path, O_CREAT|O_WRONLY|O_APPEND, S_IRWXU|S_IRWXG|S_IRWXO);
 
-        if(file_piece_descriptor == -1){
-            add_assoc_bool(return_value, "state", 0);
-            add_assoc_string(return_value, "msg", "failed to map file", 1);
+        end_offset = _get_end_offset(file_map_addr, start_offset, file_info.st_size, file_piece_size);
+
+        if(end_offset-start_offset == 0 || end_offset == -1){
             break;
         }
 
-
-        //printf("%c\n", flag);
-        printf("casa is %s\n", new_file_path);
-
-        ////writed_length = write(file_piece_descriptor, file_map_addr + page_offset, file_piece_size);
-
+        file_piece_descriptor = open(new_file_path, O_CREAT|O_WRONLY, S_IRWXU|S_IRWXG|S_IRWXO);
+        writed_length = write(file_piece_descriptor, file_map_addr + start_offset, end_offset-start_offset+1);
+        start_offset = end_offset + 1;
         add_next_index_string(result_files, new_file_path, 1);
         close(file_piece_descriptor);
     }
@@ -283,10 +285,29 @@ PHP_FUNCTION(casa_split_file)
 
     munmap(file_map_addr, file_info.st_size);
     close(file_descriptor);
-    //add_next_index_string(return_value, "hello",1);
 }
 /* }}} */
 
+off64_t _get_end_offset(char *file_map_addr, off64_t start_offset, long long file_size, int file_piece_size)
+{
+    char flag;
+    int gap_length=0;
+
+    if ( ( start_offset + file_piece_size ) >= file_size){
+        return (off64_t)file_size;
+    }
+
+    if (start_offset >= file_size){
+        return -1;
+    }
+
+    flag = *(file_map_addr+start_offset+file_piece_size+gap_length);
+    while(flag != '\n'){
+        gap_length++;
+        flag = *(file_map_addr+start_offset+file_piece_size+gap_length);
+    }
+    return start_offset+file_piece_size+gap_length;
+}
 
 /*
  * Local variables:
