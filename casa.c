@@ -194,7 +194,7 @@ PHP_FUNCTION(casa_split_file)
     int file_piece_size;
     /*variable for mmap*/
     char *file_map_addr;
-    int file_descriptor, file_piece_descriptor;
+    int file_descriptor, file_piece_descriptor, result;
     struct stat file_info;
     off64_t page_offset = 0;
     off64_t seek_offset = 0;
@@ -258,7 +258,6 @@ PHP_FUNCTION(casa_split_file)
     strcpy(new_file_path, dir);
     strcat(new_file_path, filename);
 
-
     total_count = ceil(file_info.st_size / file_piece_size);
 
     for(current_count = 0; current_count < total_count; current_count++){
@@ -288,7 +287,7 @@ PHP_FUNCTION(casa_split_file)
 }
 /* }}} */
 
-off64_t _get_end_offset(char *file_map_addr, off64_t start_offset, long long file_size, int file_piece_size)
+static off64_t _get_end_offset(char *file_map_addr, off64_t start_offset, long long file_size, int file_piece_size)
 {
     char flag;
     int gap_length=0;
