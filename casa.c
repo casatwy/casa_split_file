@@ -284,8 +284,8 @@ PHP_FUNCTION(casa_split_file)
 
         sprintf(count_string, "%lld", start_offset);
         add_assoc_string(result_info, "startOffset", count_string, 1);
-        sprintf(count_string, "%lld", end_offset);
-        add_assoc_string(result_info, "endOffset", count_string, 1);
+        sprintf(count_string, "%lld", end_offset-start_offset+1);
+        add_assoc_string(result_info, "length", count_string, 1);
 
 
         add_next_index_zval(result_index_info, result_info);
