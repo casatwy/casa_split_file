@@ -189,11 +189,13 @@ PHP_FUNCTION(casa_split_file)
 
     char filepath[256];
     zval *result_files;
+    zval *result_index_info;
+    zval *result_info;
 
     int sys_page_size;
     int file_piece_size;
     /*variable for mmap*/
-    char *file_map_addr;
+    char *file_map_addr, *file_map_temp_addr;
     int file_descriptor, file_piece_descriptor, result;
     struct stat file_info;
     off64_t page_offset = 0;
@@ -216,6 +218,7 @@ PHP_FUNCTION(casa_split_file)
 
     sys_page_size = sysconf(_SC_PAGE_SIZE);
     file_piece_size = sys_page_size*2*1024;
+    file_piece_size = 70;
 
     array_init(return_value);
 
@@ -255,16 +258,20 @@ PHP_FUNCTION(casa_split_file)
         return;
     }
 
-    strcpy(new_file_path, dir);
-    strcat(new_file_path, filename);
+    //strcpy(new_file_path, dir);
+    //strcat(new_file_path, filename);
 
     total_count = ceil(file_info.st_size / file_piece_size);
 
-    for(current_count = 0; current_count < total_count; current_count++){
-        sprintf(count_string, "%d", current_count);
-        strcpy(new_file_path, filepath);
-        strcat(new_file_path, count_string);
+    MAKE_STD_ZVAL(result_index_info);
+    array_init(result_index_info);
 
+    file_map_temp_addr = file_map_addr;
+
+    for(current_count = 0; current_count < total_count; current_count++){
+        //sprintf(count_string, "%d", current_count);
+        //strcpy(new_file_path, filepath);
+        //strcat(new_file_path, count_string);
 
         end_offset = _get_end_offset(file_map_addr, start_offset, file_info.st_size, file_piece_size);
 
@@ -272,15 +279,25 @@ PHP_FUNCTION(casa_split_file)
             break;
         }
 
-        file_piece_descriptor = open(new_file_path, O_CREAT|O_WRONLY, S_IRWXU|S_IRWXG|S_IRWXO);
-        writed_length = write(file_piece_descriptor, file_map_addr + start_offset, end_offset-start_offset+1);
+        MAKE_STD_ZVAL(result_info);
+        array_init(result_info);
+
+        sprintf(count_string, "%lld", start_offset);
+        add_assoc_string(result_info, "startOffset", count_string, 1);
+        sprintf(count_string, "%lld", end_offset);
+        add_assoc_string(result_info, "endOffset", count_string, 1);
+
+
+        add_next_index_zval(result_index_info, result_info);
+        ////file_piece_descriptor = open(new_file_path, O_CREAT|O_WRONLY, S_IRWXU|S_IRWXG|S_IRWXO);
+        ////writed_length = write(file_piece_descriptor, file_map_addr + start_offset, end_offset-start_offset+1);
         start_offset = end_offset + 1;
-        add_next_index_string(result_files, new_file_path, 1);
-        close(file_piece_descriptor);
+        //add_next_index_string(result_files, new_file_path, 1);
+        //close(file_piece_descriptor);
     }
 
     add_assoc_bool(return_value, "state", 1);
-    add_assoc_zval(return_value, "files", result_files);
+    add_assoc_zval(return_value, "fileOffsets", result_index_info);
 
     munmap(file_map_addr, file_info.st_size);
     close(file_descriptor);

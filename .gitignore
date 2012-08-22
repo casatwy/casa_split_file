@@ -27,3 +27,4 @@ libtool
 .libs/
 modules/
 tags
+config.h.in~
